@@ -1,0 +1,17 @@
+[package]
+name = "encrypted_chat"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = "0.16"
+futures-util = "0.3"
+
+
+
+
+
+
+
+

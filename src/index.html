@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Chat</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f0;
+        }
+        #nickname-container, #chat-container {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            justify-content: center;
+            align-items: center;
+        }
+        #nickname-container {
+            height: 100vh;
+        }
+        #chat-container {
+            display: none;
+            height: 100vh;
+        }
+        #nickname-input, #message-input {
+            padding: 10px;
+            font-size: 16px;
+            margin-bottom: 10px;
+            width: 100%;
+            max-width: 300px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        #nickname-button, #send-button {
+            padding: 10px;
+            font-size: 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            max-width: 300px;
+        }
+        #nickname-button:hover, #send-button:hover:not(:disabled) {
+            background-color: #0056b3;
+        }
+        #chat {
+            width: 100%;
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: white;
+            border: 1px solid #ccc;
+            padding: 10px;
+            overflow-y: auto;
+            height: calc(100vh - 140px);
+        }
+    </style>
+</head>
+<body>
+    <div id="nickname-container">
+        <input type="text" id="nickname-input" placeholder="Enter your nickname">
+        <button id="nickname-button">Enter Chat</button>
+    </div>
+
+    <div id="chat-container">
+        <div id="chat"></div>
+        <input type="text" id="message-input" placeholder="Type a message...">
+        <button id="send-button" disabled>Send</button>
+    </div>
+
+    <script>
+        const nicknameContainer = document.getElementById('nickname-container');
+        const chatContainer = document.getElementById('chat-container');
+        const nicknameInput = document.getElementById('nickname-input');
+        const nicknameButton = document.getElementById('nickname-button');
+        const chat = document.getElementById('chat');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+
+        let nickname = '';
+
+        nicknameButton.addEventListener('click', () => {
+            nickname = nicknameInput.value.trim();
+            if (nickname) {
+                nicknameContainer.style.display = 'none';
+                chatContainer.style.display = 'flex';
+                startChat();
+            }
+        });
+
+        function startChat() {
+            const ws = new WebSocket('ws://localhost:8080');
+
+            ws.onopen = () => {
+                console.log('Connected to WebSocket server');
+                sendButton.disabled = false;
+            };
+
+            ws.onmessage = (event) => {
+                const message = event.data;
+                const messageElement = document.createElement('div');
+                messageElement.textContent = message;
+                chat.appendChild(messageElement);
+                chat.scrollTop = chat.scrollHeight;
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket connection closed');
+                sendButton.disabled = true;
+            };
+
+            sendButton.addEventListener('click', () => {
+                if (ws.readyState === WebSocket.OPEN) {
+                    const message = `${nickname}: ${messageInput.value}`;
+                    if (message) {
+                        ws.send(message);
+                        messageInput.value = '';
+                    }
+                } else {
+                    console.error('WebSocket is not open.');
+                }
+            });
+
+            messageInput.addEventListener('keypress', (event) => {
+                if (event.key === 'Enter') {
+                    sendButton.click();
+                }
+            });
+        }
+    </script>
+</body>
+</html>
