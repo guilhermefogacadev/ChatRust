@@ -1,167 +1,172 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebSocket Chat with Media Upload</title>
+    <title>Chat em Rust</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            margin: 0;
-            padding: 0;
-            background-color: #f0f0f0;
-        }
-        #nickname-container, #chat-container {
-            display: flex;
-            flex-direction: column;
-            flex: 1;
-            justify-content: center;
-            align-items: center;
-        }
-        #nickname-container {
-            height: 100vh;
-        }
-        #chat-container {
-            display: none;
-            height: 100vh;
-        }
-        #nickname-input, #message-input {
-            padding: 10px;
-            font-size: 16px;
-            margin-bottom: 10px;
+        #editor {
             width: 100%;
-            max-width: 300px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        #nickname-button, #send-button, #upload-button {
+            height: 10vh;
+            border: 1px solid black;
+            border-radius: 10px;
+            margin-top: 2px;
             padding: 10px;
-            font-size: 16px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            width: 100%;
-            max-width: 300px;
-            margin-bottom: 10px;
-        }
-        #nickname-button:hover, #send-button:hover:not(:disabled), #upload-button:hover {
-            background-color: #0056b3;
-        }
-        #chat {
-            width: 100%;
-            max-width: 600px;
-            margin: 20px auto;
-            background-color: white;
-            border: 1px solid #ccc;
-            padding: 10px;
+            box-sizing: border-box;
+            direction: ltr;
+            white-space: pre-wrap;
             overflow-y: auto;
-            height: calc(100vh - 180px);
+            overflow-x: hidden;
+            /* Esconde a barra de rolagem horizontal */
+        }
+
+        #messages {
+            width: 100%;
+            height: 70vh;
+            border: 1px solid black;
+            border-radius: 10px;
+            padding: 10px;
+            box-sizing: border-box;
+            overflow-y: auto;
+            word-wrap: break-word;
+            /* Quebra de linha automática para o texto longo */
+        }
+
+        #login {
+            margin-bottom: 20px;
+        }
+
+        #sendButton,
+        #mediaButton {
+            margin-top: 10px;
+        }
+
+        img.chat-image {
+            max-width: 200px;
+            max-height: 200px;
+            display: block;
+            margin: 10px 0;
         }
     </style>
 </head>
+
 <body>
-    <div id="nickname-container">
-        <input type="text" id="nickname-input" placeholder="Enter your nickname">
-        <button id="nickname-button">Enter Chat</button>
+    <div id="login">
+        <input type="text" id="username" placeholder="Nome de Usuário">
+        <input type="text" id="token" placeholder="Token JWT">
+        <button onclick="connect()">Conectar</button>
     </div>
 
-    <div id="chat-container">
-        <div id="chat"></div>
-        <input type="text" id="message-input" placeholder="Type a message...">
-        <button id="send-button" disabled>Send</button>
-        <input type="file" id="upload-input" accept="image/*,video/*" style="display:none;">
-        <button id="upload-button">Upload Media</button>
-    </div>
+    <div id="messages"></div>
+
+    <div id="editor" contenteditable="true" placeholder="Digite sua mensagem aqui..."></div>
+    <button id="sendButton">Enviar</button>
+    <input type="file" id="mediaInput" style="display:none" accept="image/*">
+    <button id="mediaButton" onclick="sendMedia()">Enviar Mídia</button>
 
     <script>
-        const nicknameContainer = document.getElementById('nickname-container');
-        const chatContainer = document.getElementById('chat-container');
-        const nicknameInput = document.getElementById('nickname-input');
-        const nicknameButton = document.getElementById('nickname-button');
-        const chat = document.getElementById('chat');
-        const messageInput = document.getElementById('message-input');
-        const sendButton = document.getElementById('send-button');
-        const uploadButton = document.getElementById('upload-button');
-        const uploadInput = document.getElementById('upload-input');
+        let ws;
+        let username;
 
-        let nickname = '';
+        function connect() {
+            const token = document.getElementById('token').value;
+            username = document.getElementById('username').value;
 
-        nicknameButton.addEventListener('click', () => {
-            nickname = nicknameInput.value.trim();
-            if (nickname) {
-                nicknameContainer.style.display = 'none';
-                chatContainer.style.display = 'flex';
-                startChat();
+            if (!token || !username) {
+                alert('Nome de usuário e token são obrigatórios.');
+                return;
             }
-        });
 
-        function startChat() {
-            const ws = new WebSocket('ws://localhost:8080');
+            ws = new WebSocket('ws://127.0.0.1:8080');
 
             ws.onopen = () => {
-                console.log('Connected to WebSocket server');
-                sendButton.disabled = false;
+                console.log('Conectado ao servidor WebSocket');
+                ws.send(`${username}:${token}`);
             };
 
             ws.onmessage = (event) => {
+                const messagesDiv = document.getElementById('messages');
                 const message = event.data;
-                const messageElement = document.createElement('div');
-                messageElement.innerHTML = message;
-                chat.appendChild(messageElement);
-                chat.scrollTop = chat.scrollHeight;
-            };
 
-            ws.onerror = (error) => {
-                console.error('WebSocket error:', error);
+                try {
+                    const parsedMessage = JSON.parse(message);
+                    if (parsedMessage.type === 'media') {
+                        const img = document.createElement('img');
+                        img.src = `data:image/png;base64,${parsedMessage.data}`;
+                        img.alt = parsedMessage.filename;
+                        img.classList.add('chat-image');
+                        messagesDiv.appendChild(img);
+                    } else {
+                        throw new Error('Mensagem não é uma mídia');
+                    }
+                } catch (e) {
+                    // Mensagem de texto
+                    const messageElement = document.createElement('div');
+                    messageElement.textContent = message;
+                    messagesDiv.appendChild(messageElement);
+                }
+
+                messagesDiv.scrollTop = messagesDiv.scrollHeight; // Move a rolagem para o final
             };
 
             ws.onclose = () => {
-                console.log('WebSocket connection closed');
-                sendButton.disabled = true;
+                console.log('Conexão WebSocket fechada');
             };
 
-            sendButton.addEventListener('click', () => {
-                if (ws.readyState === WebSocket.OPEN) {
-                    const message = `${nickname}: ${messageInput.value}`;
-                    if (message) {
-                        ws.send(message);
-                        messageInput.value = '';
-                    }
-                } else {
-                    console.error('WebSocket is not open.');
+            ws.onerror = (error) => {
+                console.error('Erro no WebSocket:', error);
+            };
+        }
+
+        document.getElementById('sendButton').addEventListener('click', () => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const editor = document.getElementById('editor');
+                const message = editor.innerText.trim();
+
+                if (message) {
+                    ws.send(`[${username}]: ${message}`);
+                    editor.innerText = ''; // Limpa o editor após o envio
                 }
-            });
+            }
+        });
 
-            uploadButton.addEventListener('click', () => {
-                uploadInput.click();
-            });
+        document.getElementById('editor').addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                document.getElementById('sendButton').click();
+            }
+        });
 
-            uploadInput.addEventListener('change', () => {
-                if (ws.readyState === WebSocket.OPEN && uploadInput.files.length > 0) {
-                    const file = uploadInput.files[0];
+        document.getElementById('editor').addEventListener('keypress', (event) => {
+            if (event.key === 'Enter' && event.shiftKey) {
+                document.execCommand('insertHTML', false, '<br><br>');
+                event.preventDefault();
+            }
+        });
+
+        function sendMedia() {
+            const mediaInput = document.getElementById('mediaInput');
+            mediaInput.click();
+
+            mediaInput.onchange = () => {
+                const file = mediaInput.files[0];
+                if (file) {
                     const reader = new FileReader();
-
                     reader.onload = () => {
-                        const base64Data = reader.result;
-                        const message = `${nickname} uploaded: <br><img src="${base64Data}" style="max-width:100%; max-height:300px;">`;
-                        ws.send(message);
+                        const data = reader.result.split(',')[1]; // Remove o prefixo
+                        const mediaMessage = {
+                            type: 'media',
+                            data: data,
+                            filename: file.name
+                        };
+                        ws.send(JSON.stringify(mediaMessage));
                     };
-
                     reader.readAsDataURL(file);
                 }
-            });
-
-            messageInput.addEventListener('keypress', (event) => {
-                if (event.key === 'Enter') {
-                    sendButton.click();
-                }
-            });
+            };
         }
     </script>
 </body>
+
 </html>
